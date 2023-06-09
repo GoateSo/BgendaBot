@@ -25,29 +25,27 @@ export function isCacheDirty() {
     return cacheDirty;
 }
 
-async function items(): Promise<Schema[]> {
-    // gets all items, sorts in order of importance and then in insertion order
-    if (cacheDirty) {
-        cache = [];
-        for await (const name of client.scanIterator()) {
-            const { time, importance, desc } = await client.hGetAll(name) as Schema;
-            cache.push({ name, time, importance, desc });
-        }
-        cache.sort((a, b) => {
-            const importanceA = parseInt(a.importance);
-            const importanceB = parseInt(b.importance);
-            if (importanceA == importanceB) {
-                return a.time.localeCompare(b.time);
-            } else {
-                return importanceB - importanceA; // hi importance first
-            }
-        });
-        cacheDirty = false;
+// internal helper functions to reset cache and get items
+async function resetCache() {
+    cache = [];
+    // get all items from db
+    for await (const name of client.scanIterator()) {
+        const { time, importance, desc } = await client.hGetAll(name) as Schema;
+        cache.push({ name, time, importance, desc });
     }
-    return cache;
+    // sort cache by importance, secondarily by insertion order
+    cache.sort((a, b) => {
+        const importanceA = parseInt(a.importance);
+        const importanceB = parseInt(b.importance);
+        if (importanceA == importanceB) {
+            return a.time.localeCompare(b.time);
+        } else {
+            return importanceB - importanceA; // hi importance first
+        }
+    });
+    cacheDirty = false;
 }
-
-// uses importance as a proxy check for existence
+// uses importance as a proxy check for existence in DB queries
 
 /**
  * adds an item to the agenda
@@ -72,7 +70,6 @@ export async function add(item: string, { importance = Importance.DEFAULT, desc 
     }
 }
 
-// unused earlier version -- unified update command
 /**
  * updates an agenda item with a new importance level or more info
  * @param item item to update
@@ -133,8 +130,9 @@ export async function rem(item: string): Promise<Result<void>> {
  */
 export async function getItems(): Promise<Result<Schema[]>> {
     await connect();
-    // get all items, sort by importance and then by insertion order
-    return succ(await items());
+    // get should always reset the cache - even if order is unchanged - for updated items
+    await resetCache();
+    return succ(cache);
 }
 
 /**
