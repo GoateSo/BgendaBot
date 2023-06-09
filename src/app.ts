@@ -1,8 +1,7 @@
 import { add, clear, getItems, isCacheDirty, rem, update } from './utils/db';
 import { App, LogLevel, MessageAttachment, RespondArguments } from '@slack/bolt';
 import './utils/env';
-import { Result, isFail, isSucc } from './utils/result';
-import { Schema } from './utils/types';
+import { Schema, Result, isFail, isSucc } from './utils/types';
 import { left as fail, right as succ } from 'fp-ts/lib/Either';
 
 const app = new App({

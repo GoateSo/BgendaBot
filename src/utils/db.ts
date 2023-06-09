@@ -1,7 +1,6 @@
 import { createClient } from 'redis';
-import { Result } from './result';
 import { left as fail, right as succ } from 'fp-ts/lib/Either';
-import { Importance, Schema, fromStr, isValidImportance } from './types';
+import { Importance, Schema, fromStr, isValidImportance, Result } from './types';
 
 const client = createClient();
 
