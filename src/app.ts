@@ -103,7 +103,7 @@ async function updateCheck(input: string): Promise<Result<[number, string, strin
             "please run /listitems again to make sure you have the latest data"
         )
     }
-    const inputs = input.trimStart().match(/([0-9]+)\s+(\w+)/);
+    const inputs = input.trimStart().match(/^([0-9]+)\s+?(.+)$/);
     if (inputs == null) {
         return fail(`update failed: invalid input`);
     }
