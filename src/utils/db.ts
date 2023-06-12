@@ -12,22 +12,10 @@ export async function connect() {
     if (!client.isOpen) await client.connect();
 }
 
-let cache: Schema[] = [];
-let cacheDirty = true;
 
-/**
- * check if the data has been updated since the last call to items(). When
- * removing or updating items, this should be checked before calling items()
- * to avoid accidently modifying wrong/already modified data.
- * @returns whether the data has been updated since the last call to items()
- */
-export function isCacheDirty() {
-    return cacheDirty;
-}
-
-// internal helper functions to reset cache and get items
-async function resetCache() {
-    cache = [];
+// internal helper functions to get items
+async function queryItems(): Promise<Schema[]> {
+    const cache: Schema[] = [];
     // get all items from db
     for await (const name of client.scanIterator()) {
         const { time, importance, desc } = await client.hGetAll(name) as Schema;
@@ -43,7 +31,7 @@ async function resetCache() {
             return importanceB - importanceA; // hi importance first
         }
     });
-    cacheDirty = false;
+    return cache;
 }
 // uses importance as a proxy check for existence in DB queries
 
@@ -59,13 +47,12 @@ export async function add(item: string, { importance = Importance.DEFAULT, desc 
     if (await client.hExists(item, "importance")) {
         return fail(`Item "${item}" already in agenda`);
     } else {
-        // add item with default importance and desc, flag cache as dirty
+        // add item with default importance and desc
         await client.hSet(item, {
             time: new Date().toISOString(),
             importance: importance,
             desc: desc
         });
-        cacheDirty = true;
         return succ(undefined);
     }
 }
@@ -77,32 +64,37 @@ export async function add(item: string, { importance = Importance.DEFAULT, desc 
  * @param newVal new value for field
  * @returns indiction of success, or failure with message
  */
-export async function update(item: string, key: string, newVal: string): Promise<Result<void>> {
+export async function update(item: string, key: "importance" | "desc" | "name", newVal: string): Promise<Result<void>> {
     await connect();
     // check if item exists
     if (!await client.hExists(item, "importance"))
         return fail(`Item "${item}" not in agenda`);
-    // check if key is valid
-    key = key.trim().toLowerCase();
-    if (key !== "importance" && key !== "desc")
-        return fail(`Invalid field "${key}"`);
     // change importance field  
     if (key === "importance") {
         newVal = newVal.trim().toUpperCase();
         if (isNaN(parseInt(newVal))) { // string importance
             if (!isValidImportance(newVal))
                 return fail(`Invalid importance level "${newVal}"`);
-            cacheDirty = true;
             await client.hSet(item, key, fromStr(newVal));
         } else { // direct numeric importance
             const n = parseInt(newVal);
             if (n < Importance.MIN || n > Importance.MAX)
                 return fail(`Invalid importance level "${newVal}"`);
-            cacheDirty = true;
             await client.hSet(item, key, n);
         }
-    } else { // change desc field
+    } else if (key === "desc") { // change desc field
         await client.hSet(item, key, newVal);
+    } else if (key == "name") { // change name field
+        // check if new name already exists
+        if (await client.hExists(newVal, "importance")) {
+            return fail(`Item with name "${newVal}" already in agenda`);
+        }
+        // get item from db
+        // schema technically isn't correct b/c name isn't a field, but it works for this sake
+        const { time, importance, desc } = await client.hGetAll(item) as Schema;
+        // remove old item, add new item
+        await client.del(item);
+        await client.hSet(newVal, { time, importance, desc });
     }
     return succ(undefined);
 }
@@ -118,9 +110,7 @@ export async function rem(item: string): Promise<Result<void>> {
     if (!await client.hExists(item, "importance")) {
         return fail(`Item "${item}" not in agenda`);
     }
-    // remove item, flag cache as dirty
     await client.del(item);
-    cacheDirty = true;
     return succ(undefined);
 }
 
@@ -130,9 +120,7 @@ export async function rem(item: string): Promise<Result<void>> {
  */
 export async function getItems(): Promise<Result<Schema[]>> {
     await connect();
-    // get should always reset the cache - even if order is unchanged - for updated items
-    await resetCache();
-    return succ(cache);
+    return succ(await queryItems());
 }
 
 /**
@@ -141,9 +129,7 @@ export async function getItems(): Promise<Result<Schema[]>> {
  */
 export async function clear(): Promise<Result<void>> {
     await connect();
-    // clear all items, flag cache as dirty
     const message = await client.flushDb();
-    cacheDirty = true;
     if (!message.startsWith("OK")) {
         return fail(`agenda could not be cleared, got message: ${message}`);
     }
