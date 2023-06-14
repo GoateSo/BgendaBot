@@ -8,19 +8,21 @@ client.on('error', (err) => {
     console.error(err);
 });
 
-export async function connect() {
+async function connect() {
     if (!client.isOpen) await client.connect();
 }
 
 
 // internal helper functions to get items
-async function queryItems(): Promise<Schema[]> {
+// returns all items in the agenda, sorted by importance and insertion order, unless specified otherwise
+async function queryItems(sorted = true): Promise<Schema[]> {
     const cache: Schema[] = [];
     // get all items from db
     for await (const name of client.scanIterator()) {
         const { time, importance, desc } = await client.hGetAll(name) as Schema;
         cache.push({ name, time, importance, desc });
     }
+    if (!sorted) return cache;
     // sort cache by importance, secondarily by insertion order
     cache.sort((a, b) => {
         const importanceA = parseInt(a.importance);
@@ -36,7 +38,7 @@ async function queryItems(): Promise<Schema[]> {
 // uses importance as a proxy check for existence in DB queries
 
 /**
- * adds an item to the agenda
+ * adds an item to the agenda, failinb if the item already existsc in the agenda
  * @param item item name to add
  * @param param1 optional importance and desc
  * @returns indication of success, or failure with message
@@ -118,9 +120,9 @@ export async function rem(item: string): Promise<Result<void>> {
  * gets all items in the agenda sorted by importance and then by insertion order
  * @returns all items in the agenda sorted by importance and then by insertion order, or an error message
  */
-export async function getItems(): Promise<Result<Schema[]>> {
+export async function getItems(sorted = true): Promise<Result<Schema[]>> {
     await connect();
-    return succ(await queryItems());
+    return succ(await queryItems(sorted));
 }
 
 /**

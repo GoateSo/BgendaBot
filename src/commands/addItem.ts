@@ -5,6 +5,15 @@ import { isSucc } from "../utils/types";
 import { fieldInput, ptext } from "../utils/commandModals";
 
 // respond with modal input for adding an item
+/**
+ * init function for the additem command, setting up the slash command and the view submission listener
+ * 
+ * - \additem -  opens a modal for adding an item, prompting for name, importance, and description, of which only name is required,
+ *               importance has a default of '0', and description is optional
+ * - view submission - adds the item to the database and responds with a message to the user detailing the success or failure of the operation 
+ *                     with an accompanying message 
+ * 
+ */
 export function init() {
 
     app.command('/additem', async ({ ack, client, body }) => {

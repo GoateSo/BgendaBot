@@ -2,7 +2,7 @@ import { SlashCommand, View } from "@slack/bolt";
 import { app } from "../app";
 import { FieldName, fieldInput, itemsToOptions, ptext } from "../utils/commandModals";
 import { update } from "../utils/db";
-import { isFail, isSucc } from "../utils/types";
+import { isSucc } from "../utils/types";
 
 // edit item, dynamic options
 // query db for items, prompt field, and then prompt new value in new modal
@@ -51,11 +51,36 @@ const initEditModal = async (body: SlashCommand): Promise<View> => {
     };
 }
 
+/**
+ * checks if a given string is a valid field of the item 
+ * currently, the fields are 
+ * - name
+ * - desc
+ * - importance
+ * @param field string to check if it is a valid field name
+ * @returns boolean if the field is a valid field name
+ */
 function isValidField(field: string): field is FieldName {
     return field === "name" || field === "desc" || field === "importance";
 }
 
+/**
+ * Initialize the update item command, and sets up all required listeners
+ * 
+ * - `/update` - opens a modal to update an item, originally prompts for just the item name and field to update via dropdowns
+ *               (static_selects) and then opens a new modal with the appropriate input type (text_input or static_select) based
+ *               on the field chosen
+ * - `EditItem` - acknowledge that item was chosen, does nothing else
+ * - `EditField` - opens new modal with relevent input based on chosen field
+ *                 - `name` - text_input
+ *                 - `desc` - text_input
+ *                 - `importance` - static_select
+ * - `updateitem` - shouldn't be ever fired -- premature click on submit button before field is chosen and the modal is updated 
+ * - `updatedUpdate` - the updated modal for the update command (ik not a rly good name but w/e), updates the database with the new value
+ *                     and then sends an ephemeral message to the user either with the error message produced, or a success message
+ */
 export function init() {
+    // open a modal to update an item
     app.command('/update', async ({ ack, client, body }) => {
         await ack();
         await client.views.open({
@@ -141,25 +166,24 @@ export function init() {
         } as any);
     });
 
+    // update send request to db, and send ephemeral message to user with success or error message
     app.view('updatedUpdate', async ({ ack, view, client }) => {
         await ack();
         const input = view.state.values.updateBlock.updateInput;
-        // console.log(values);
         const { item, field } = JSON.parse(view.private_metadata) as { item: string, field: string };
-        let nval: string | null | undefined;
-        const selected = input.selected_option;
-        if (selected) { // importance
-            nval = selected.text.text;
-        } else { // name / desc 
-            nval = input.value;
-        }
+        // if its static select, get the text in text field, otherwise get the value
+        // this works out better for feedback purposes (e.g. "updated importance to high")
+        const nval = input.selected_option
+            ? input.selected_option.text.text
+            : input.value;
         if (!nval) {
-            console.error("no new value");
+            console.error("no new value provided to update"); // required field option should handle this
             return;
         }
         const fieldName = field.toLowerCase().trim();
         if (fieldName !== "importance" && fieldName !== "name" && fieldName !== "desc") {
-            console.error("invalid field");
+            // this should never happen
+            console.error("invalid field provided to update -- issue w/ my implementation of EditField action");
             return;
         }
         const res = await update(item.trim(), fieldName, nval);

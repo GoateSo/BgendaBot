@@ -9,6 +9,9 @@ const helpMap: { [key: string]: string } = {
     help: "*/help* - lists all commands and their descriptions"
 }
 
+/**
+ * initializes the help command for the app, which lists all commands and their descriptions, or a specific command's description if given
+ */
 export function init() {
     app.command('/help', async ({ ack, respond, command }) => {
         await ack();

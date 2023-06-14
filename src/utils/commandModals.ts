@@ -7,7 +7,8 @@ import { isFail } from "./types";
  * @returns Promise of a list of options for a static select
  */
 export async function itemsToOptions(): Promise<PlainTextOption[]> {
-    const items = await getItems();
+    // don't need to take the time to sort the items
+    const items = await getItems(false);
     if (isFail(items)) {
         throw new Error("Failed to get items");
     }
