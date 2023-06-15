@@ -1,70 +1,116 @@
-import { SlashCommand, View } from "@slack/bolt";
+import { SlackAction, SlashCommand, View } from "@slack/bolt";
 import { app } from "../app";
 import { fieldInput, itemsToOptions, ptext } from "../utils/commandModals";
 import { update } from "../utils/db";
-import { Inputs, Result, isSucc } from "../utils/types";
+import { Result, UpdateData, isFail, isSucc, isValidField } from "../utils/types";
+import { left as fail, right as succ } from 'fp-ts/lib/Either';
 
-// edit item, dynamic options
-// query db for items, prompt field, and then prompt new value in new modal
-// update view with either text input for name/desc or static select for importance
-const initEditModal = async (body: SlashCommand): Promise<View> => {
+function updateView({ item, field, channel, sender }: UpdateData): View {
     return {
-        "title": ptext("Update an Agenda item"),
-        "submit": ptext("Submit"),
-        "close": ptext("Cancel"),
-        "callback_id": "updateitem",
-        "type": "modal",
-        "blocks": [
+        submit: ptext("Submit"),
+        close: ptext("Cancel"),
+        private_metadata: JSON.stringify({ item, field, channel, sender }),
+        type: "modal",
+        callback_id: "updatedUpdate",
+        title: {
+            type: "plain_text",
+            text: "Update Description",
+            emoji: true
+        },
+        blocks: [
             {
-                type: "input",
-                dispatch_action: true,
-                element: {
-                    "type": "static_select",
-                    "placeholder": ptext("Select an item"),
-                    "options": await itemsToOptions(),
-                    "action_id": "EditItem"
-                },
-                label: ptext("Item"),
-                block_id: "ItemBlock"
+                type: "section",
+                text: {
+                    type: "plain_text",
+                    text: `editing ${field} of ${item} `,
+                }
             },
             {
                 type: "input",
-                dispatch_action: true,
-                element: {
-                    type: "static_select",
-                    placeholder: ptext("Select a field"),
-                    action_id: "EditField",
-                    options: [
-                        { "text": ptext("Name"), "value": "name" },
-                        { "text": ptext("Description"), "value": "desc" },
-                        { "text": ptext("Importance"), "value": "importance" },
-                        { "text": ptext("Due Date"), "value": "due_date" },
-                        { "text": ptext("Assignees"), "value": "assignees" }
-                    ]
-                },
-                label: ptext("Field"),
-                block_id: "FieldBlock"
+                block_id: `updateBlock`,
+                element: fieldInput(field, "updateInput"),
+                optional: field === "assignees" ? true : false,
+                label: {
+                    type: "plain_text",
+                    text: `new ${field}`,
+                    emoji: true
+                }
             }
-        ],
-        "private_metadata": JSON.stringify({
-            "channel": body.channel_id,
-            "sender": body.user_id
-        })
+        ]
     };
 }
+function getInputs(body: SlackAction): Result<UpdateData> {
+    if (body.type !== 'block_actions' || !body.view) {
+        return fail("invalid body type");
+    }
 
-/**
- * checks if a given string is a valid field of the item 
- * currently, the fields are 
- * - name
- * - desc
- * - importance
- * @param field string to check if it is a valid field name
- * @returns boolean if the field is a valid field name
- */
-function isValidField(field: string): field is keyof Inputs {
-    return field === "name" || field === "desc" || field === "importance" || field === "due_date" || field === "assignees";
+    const values = body.view.state.values;
+    const item = values?.ItemBlock?.Edit?.selected_option?.text.text;
+    const field = values?.FieldBlock?.Edit?.selected_option?.value;
+
+    if (!field || !item) {
+        // both are required fields, so this should never happen
+        console.error("no field or item provided");
+        return fail("invalid field or item provided");
+    }
+    if (!isValidField(field)) {
+        // Field is static-select, so this should never happen
+        console.error("invalid field provided - implementation issue w/ field input");
+        return fail("invalid field provided - implementation issue w/ field input");
+    }
+    const metadata = JSON.parse(body.view.private_metadata);
+
+    return succ({ item, field, ...metadata });
 }
+// edit item, dynamic options
+// query db for items, prompt field, and then prompt new value in new modal
+// update view with either text input for name/desc or static select for importance
+const initEditModal = async (body: SlashCommand): Promise<View> => ({
+    "title": ptext("Update an Agenda item"),
+    "submit": ptext("Submit"),
+    "close": ptext("Cancel"),
+    "callback_id": "updateitem",
+    "type": "modal",
+    "blocks": [
+        {
+            type: "input",
+            dispatch_action: true,
+            element: {
+                "type": "static_select",
+                "placeholder": ptext("Select an item"),
+                "options": await itemsToOptions(),
+                "action_id": "Edit"
+            },
+            label: ptext("Item"),
+            block_id: "ItemBlock"
+        },
+        {
+            type: "input",
+            dispatch_action: true,
+            element: {
+                type: "static_select",
+                placeholder: ptext("Select a field"),
+                action_id: "Edit",
+                options: [
+                    { "text": ptext("Name"), "value": "name" },
+                    { "text": ptext("Description"), "value": "desc" },
+                    { "text": ptext("Importance"), "value": "importance" },
+                    { "text": ptext("Due Date"), "value": "due_date" },
+                    { "text": ptext("Assignees"), "value": "assignees" }
+                ]
+            },
+            label: ptext("Field"),
+            block_id: "FieldBlock"
+        }
+    ],
+    "private_metadata": JSON.stringify({
+        "channel": body.channel_id,
+        "sender": body.user_id
+    })
+});
+
+
+
 
 /**
  * Initialize the update item command, and sets up all required listeners
@@ -91,69 +137,20 @@ export function init() {
         });
     });
 
-    // acknowledge that item was chosen 
-    app.action('EditItem', async ({ ack }) => {
-        await ack();
-    });
-
-
     // open new modal with relevent input based on chosen field
-    app.action('EditField', async ({ ack, body, client }) => {
+    app.action('Edit', async ({ ack, body, client }) => {
         await ack();
         if (body.type !== 'block_actions' || !body.view) {
             return;
         }
-        const values = body.view.state.values;
-        const item = values?.ItemBlock?.EditItem?.selected_option?.text.text;
-        const field = values?.FieldBlock?.EditField?.selected_option?.value;
-
-        if (!field || !item) {
-            // both are required fields, so this should never happen
-            console.error("no field or item provided");
+        const values = getInputs(body);
+        if (isFail(values)) {
             return;
         }
-        if (!isValidField(field)) {
-            // Field is static-select, so this should never happen
-            console.error("invalid field provided - implementation issue w/ field input");
-            return;
-        }
-        const metadata = JSON.parse(body.view.private_metadata);
-
         await client.views.update({
             view_id: body.view.id,
             hash: body.view.hash,
-            view: {
-                submit: ptext("Submit"),
-                close: ptext("Cancel"),
-                private_metadata: JSON.stringify({ item: item, field: field, ...metadata }),
-                type: "modal",
-                callback_id: "updatedUpdate",
-                title: {
-                    type: "plain_text",
-                    text: "Update Description",
-                    emoji: true
-                },
-                blocks: [
-                    {
-                        type: "section",
-                        text: {
-                            type: "plain_text",
-                            text: `editing ${field} of ${item} `,
-                        }
-                    },
-                    {
-                        type: "input",
-                        block_id: `updateBlock`,
-                        element: fieldInput(field, "updateInput"),
-                        optional: field === "assignees" ? true : false,
-                        label: {
-                            type: "plain_text",
-                            text: `new ${field}`,
-                            emoji: true
-                        }
-                    }
-                ]
-            }
+            view: updateView(values.right)
         });
     });
 
@@ -172,10 +169,9 @@ export function init() {
     app.view('updatedUpdate', async ({ ack, view, client }) => {
         await ack();
         const input = view.state.values.updateBlock.updateInput;
-        const { item, field } = JSON.parse(view.private_metadata) as { item: string, field: string };
+        const { item, field, channel, sender } = JSON.parse(view.private_metadata) as UpdateData;
         // 4 cases: text_input for name/desc, static_select for importance, datepicker for due_date, multi_select for assignees
         // 1st three resuslt in string, last results in array of strings
-        const { channel, sender } = JSON.parse(view.private_metadata) as { channel: string, sender: string };
         let nval: string | string[]
         let res: Result<void>;
         if (field === "assignees") {

@@ -35,6 +35,8 @@ export type FieldInputMap = {
     assignees: MultiUsersSelect
 }
 
+export type UpdateData = { item: string, field: keyof Inputs, channel: string, sender: string }
+
 // importance levels for agenda items, duplicates allowed for aliases
 export enum Importance {
     // min/default/0    -- default/minimal importance
@@ -52,8 +54,22 @@ export enum Importance {
     MAX = 3
 }
 
+
 export function isValidImportance(importance: string): importance is keyof typeof Importance {
     return Object.keys(Importance).includes(importance);
+}
+
+/**
+ * checks if a given string is a valid field of the item 
+ * currently, the fields are 
+ * - name
+ * - desc
+ * - importance
+ * @param field string to check if it is a valid field name
+ * @returns boolean if the field is a valid field name
+ */
+export function isValidField(field: string): field is keyof Inputs {
+    return field === "name" || field === "desc" || field === "importance" || field === "due_date" || field === "assignees";
 }
 
 export function fromStr(iName: keyof typeof Importance): Importance {
