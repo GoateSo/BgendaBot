@@ -57,8 +57,10 @@ export function init() {
         await ack();
         const values = view.state.values;
         const item = values?.ItemBlock?.RemoveItem?.selected_option?.text.text;
-        if (!item)
-            throw new Error("no item selected");
+        if (!item) {
+            console.error("no item selected");
+            return;
+        }
         // could still fail even w/ forced choices -- item could've been removed by someone else in the meantime
         const res = await rem(item);
         const { channel, sender } = JSON.parse(view.private_metadata) as { channel: string, sender: string };

@@ -1,6 +1,6 @@
-import { PlainTextElement, PlainTextInput, PlainTextOption, StaticSelect } from "@slack/bolt";
+import { PlainTextElement, PlainTextOption } from "@slack/bolt";
 import { getItems } from "./db";
-import { isFail } from "./types";
+import { FieldInputMap, Inputs, isFail } from "./types";
 
 /**
  * Gets all items from the database and formats them into a list
@@ -33,39 +33,48 @@ export function ptext(text: string): PlainTextElement {
     }
 }
 
-type FieldInput = StaticSelect | PlainTextInput;
-export type FieldName = "name" | "desc" | "importance";
-
 /**
  * 
  * @param field name of field, either "name", "desc", or "importance"
  * @param actid 
- * @returns 
+ * @returns a slack element for the given field
  */
-export function fieldInput(field: FieldName, actid: string): FieldInput {
-    switch (field) {
-        case "name":
-        case "desc":
-            return {
-                "type": "plain_text_input",
-                "action_id": actid,
-                "initial_value": field === "name" ? undefined : "",
-                "placeholder": ptext(field),
-            };
-        case "importance":
-            return {
-                "type": "static_select",
-                "placeholder": ptext("importance level"),
-                "initial_option": { "text": ptext("Minimal/Default"), "value": "0" },
-                "options": [
-                    { "text": ptext("Minimal/Default"), "value": "0" },
-                    { "text": ptext("Low"), "value": "1" },
-                    { "text": ptext("Medium"), "value": "2" },
-                    { "text": ptext("High"), "value": "3" }
-                ],
-                "action_id": actid
-            };
-        default:
-            throw new Error("Invalid field");
+export function fieldInput(field: keyof Inputs, actid: string) {
+    // ngl quite a bit of a pain to typecast to `FieldInputMap[typeof field];` not sure why 
+    // typescript doesn't infer it when the function is defined w/ return type `: FieldInputMap[typeof field]`
+    if (field === "name" || field === "desc") {
+        return {
+            "type": "plain_text_input",
+            "action_id": actid,
+            "initial_value": field === "name" ? undefined : "",
+            "placeholder": ptext(field),
+        } as FieldInputMap[typeof field];
+    } else if (field === "importance") {
+        return {
+            "type": "static_select",
+            "placeholder": ptext("importance level"),
+            "initial_option": { "text": ptext("Minimal/Default"), "value": "0" },
+            "options": [
+                { "text": ptext("Minimal/Default"), "value": "0" },
+                { "text": ptext("Low"), "value": "1" },
+                { "text": ptext("Medium"), "value": "2" },
+                { "text": ptext("High"), "value": "3" }
+            ],
+            "action_id": actid
+        } as FieldInputMap[typeof field];
+    } else if (field === "assignees") {
+        return {
+            "type": "multi_users_select",
+            "placeholder": ptext("Select assignees"),
+            "action_id": actid
+        } as FieldInputMap[typeof field];
+    } else if (field === "due_date") {
+        return {
+            "type": "datepicker",
+            "placeholder": ptext("Select a date"),
+            "action_id": actid
+        } as FieldInputMap[typeof field];
+    } else {
+        throw new Error("Invalid field");
     }
 }

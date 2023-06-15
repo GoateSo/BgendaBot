@@ -1,8 +1,8 @@
 import { SlashCommand, View } from "@slack/bolt";
 import { app } from "../app";
-import { FieldName, fieldInput, itemsToOptions, ptext } from "../utils/commandModals";
+import { fieldInput, itemsToOptions, ptext } from "../utils/commandModals";
 import { update } from "../utils/db";
-import { isSucc } from "../utils/types";
+import { Inputs, Result, isSucc } from "../utils/types";
 
 // edit item, dynamic options
 // query db for items, prompt field, and then prompt new value in new modal
@@ -37,7 +37,9 @@ const initEditModal = async (body: SlashCommand): Promise<View> => {
                     options: [
                         { "text": ptext("Name"), "value": "name" },
                         { "text": ptext("Description"), "value": "desc" },
-                        { "text": ptext("Importance"), "value": "importance" }
+                        { "text": ptext("Importance"), "value": "importance" },
+                        { "text": ptext("Due Date"), "value": "due_date" },
+                        { "text": ptext("Assignees"), "value": "assignees" }
                     ]
                 },
                 label: ptext("Field"),
@@ -60,8 +62,8 @@ const initEditModal = async (body: SlashCommand): Promise<View> => {
  * @param field string to check if it is a valid field name
  * @returns boolean if the field is a valid field name
  */
-function isValidField(field: string): field is FieldName {
-    return field === "name" || field === "desc" || field === "importance";
+function isValidField(field: string): field is keyof Inputs {
+    return field === "name" || field === "desc" || field === "importance" || field === "due_date" || field === "assignees";
 }
 
 /**
@@ -104,18 +106,19 @@ export function init() {
         const values = body.view.state.values;
         const item = values?.ItemBlock?.EditItem?.selected_option?.text.text;
         const field = values?.FieldBlock?.EditField?.selected_option?.value;
-        console.log(values);
-        console.log([item, field]);
+
         if (!field || !item) {
+            // both are required fields, so this should never happen
             console.error("no field or item provided");
             return;
         }
         if (!isValidField(field)) {
-            console.error("invalid field provided");
+            // Field is static-select, so this should never happen
+            console.error("invalid field provided - implementation issue w/ field input");
             return;
         }
         const metadata = JSON.parse(body.view.private_metadata);
-        console.log("opening modal")
+
         await client.views.update({
             view_id: body.view.id,
             hash: body.view.hash,
@@ -142,6 +145,7 @@ export function init() {
                         type: "input",
                         block_id: `updateBlock`,
                         element: fieldInput(field, "updateInput"),
+                        optional: field === "assignees" ? true : false,
                         label: {
                             type: "plain_text",
                             text: `new ${field}`,
@@ -155,9 +159,7 @@ export function init() {
 
     // FIXME: this is a workaround for a bug in bolt with typescript
     // ack with errors apparently isn't implemented in types....
-    app.view('updateitem', async ({ ack, view }) => {
-        console.log("updateitem rannnnn");
-        console.log(view.state.values);
+    app.view('updateitem', async ({ ack }) => {
         await ack({
             response_action: "errors",
             errors: {
@@ -171,23 +173,42 @@ export function init() {
         await ack();
         const input = view.state.values.updateBlock.updateInput;
         const { item, field } = JSON.parse(view.private_metadata) as { item: string, field: string };
-        // if its static select, get the text in text field, otherwise get the value
-        // this works out better for feedback purposes (e.g. "updated importance to high")
-        const nval = input.selected_option
-            ? input.selected_option.text.text
-            : input.value;
-        if (!nval) {
-            console.error("no new value provided to update"); // required field option should handle this
-            return;
-        }
-        const fieldName = field.toLowerCase().trim();
-        if (fieldName !== "importance" && fieldName !== "name" && fieldName !== "desc") {
-            // this should never happen
-            console.error("invalid field provided to update -- issue w/ my implementation of EditField action");
-            return;
-        }
-        const res = await update(item.trim(), fieldName, nval);
+        // 4 cases: text_input for name/desc, static_select for importance, datepicker for due_date, multi_select for assignees
+        // 1st three resuslt in string, last results in array of strings
         const { channel, sender } = JSON.parse(view.private_metadata) as { channel: string, sender: string };
+        let nval: string | string[]
+        let res: Result<void>;
+        if (field === "assignees") {
+            nval = input.selected_users ?? [];
+            res = await update(item.trim(), field, nval);
+            // for display purposes, convert to @user1, @user2, @user3
+            nval = nval.map((user: string) => `<@${user}>`).join(", ");
+        } else if (field === "due_date") {
+            nval = input.selected_date ?? "";
+            if (nval.length === 0) {
+                console.error("no new due date provided to update -- issue w/ my implementation of EditField action");
+                return;
+            }
+            res = await update(item.trim(), field, nval);
+        } else {
+            // if its static select, get the text in text field, otherwise get the value
+            // this works out better for feedback purposes (e.g. "updated importance to high")
+            nval = (input.selected_option
+                ? input.selected_option.text.text
+                : input.value) ?? "";
+            if (nval.length === 0) {
+                // required field option should handle this w/o this check
+                console.error("no new value provided to update -- issue w/ my implementation of EditField action");
+                return;
+            }
+            const fieldName = field.toLowerCase().trim();
+            if (fieldName !== "importance" && fieldName !== "name" && fieldName !== "desc") {
+                // this should never happen
+                console.error("invalid field provided to update -- issue w/ my implementation of EditField action");
+                return;
+            }
+            res = await update(item.trim(), fieldName, nval);
+        }
         await client.chat.postEphemeral({
             channel: channel,
             user: sender,

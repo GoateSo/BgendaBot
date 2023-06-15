@@ -1,4 +1,39 @@
+import { Datepicker, MultiUsersSelect, PlainTextInput, StaticSelect } from "@slack/bolt"
 import { Left, Right } from "fp-ts/lib/Either"
+
+// wrappr over either w/ string as error type and new names
+export type Succ<T> = Right<T>
+export type Fail = Left<string>
+export type Result<T> = Fail | Succ<T>
+
+export type Fields = {
+    name: string,
+    importance: string,
+    desc: string,
+    due_date: string,
+}
+
+// input fields for agenda items (including assignees)
+export type Inputs = Fields & {
+    assignees: string[],
+}
+
+// storage schema for redis db 
+export type Schema = Fields & {
+    time: string // ISO string representing insertion time
+}
+
+export type AgendaItem = Schema & {
+    assignees: string[]
+}
+
+export type FieldInputMap = {
+    name: PlainTextInput,
+    importance: StaticSelect,
+    desc: PlainTextInput,
+    due_date: Datepicker
+    assignees: MultiUsersSelect
+}
 
 // importance levels for agenda items, duplicates allowed for aliases
 export enum Importance {
@@ -24,19 +59,6 @@ export function isValidImportance(importance: string): importance is keyof typeo
 export function fromStr(iName: keyof typeof Importance): Importance {
     return Importance[iName];
 }
-
-export type Schema = {
-    name: string,
-    time: string,
-    importance: string,
-    desc: string
-}
-
-// warpper over either w/ string as error type and new names
-export type Succ<T> = Right<T>
-export type Fail = Left<string>
-export type Result<T> = Fail | Succ<T>
-
 
 export function isSucc<T>(result: Result<T>): result is Succ<T> {
     return result._tag == "Right";

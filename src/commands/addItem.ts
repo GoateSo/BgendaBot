@@ -1,7 +1,7 @@
 import { View } from "@slack/bolt";
 import { app } from "../app";
 import { add } from "../utils/db";
-import { isSucc } from "../utils/types";
+import { Fields, isSucc } from "../utils/types";
 import { fieldInput, ptext } from "../utils/commandModals";
 
 // respond with modal input for adding an item
@@ -15,10 +15,8 @@ import { fieldInput, ptext } from "../utils/commandModals";
  * 
  */
 export function init() {
-
     app.command('/additem', async ({ ack, client, body }) => {
         await ack();
-
         const addModal: View = {
             "callback_id": "additem",
             "type": "modal",
@@ -44,6 +42,20 @@ export function init() {
                     "element": fieldInput("desc", "AddAgendaDesc"),
                     "optional": true,
                     "label": ptext("Description")
+                },
+                {
+                    "type": "input",
+                    "block_id": "DueDateBlock",
+                    "element": fieldInput("due_date", "AddAgendaDueDate"),
+                    "optional": true,
+                    "label": ptext("Due Date")
+                },
+                {
+                    "type": "input",
+                    "block_id": "AssigneesBlock",
+                    "element": fieldInput("assignees", "AddAgendaAssignees"),
+                    "optional": true,
+                    "label": ptext("Assignees")
                 }
             ],
             "private_metadata": JSON.stringify({
@@ -52,16 +64,10 @@ export function init() {
             })
         }
 
-        console.log(body.trigger_id);
-        try {
-            await client.views.open({
-                trigger_id: body.trigger_id,
-                view: addModal
-            });
-        } catch (e) {
-            console.log("error in additem.ts");
-            console.error(e);
-        }
+        await client.views.open({
+            trigger_id: body.trigger_id,
+            view: addModal
+        });
     });
 
     app.view('additem', async ({ ack, view, client }) => {
@@ -71,11 +77,14 @@ export function init() {
         const imp = values?.ImportanceBlock?.AddAgendaImportance?.selected_option;
         const importance = imp?.value ?? "0";
         const desc = values?.DescBlock?.AddAgendaDesc?.value ?? "";
+        const due_date = values?.DueDateBlock?.AddAgendaDueDate?.selected_date ?? "";
+        const assignees = values?.AssigneesBlock?.AddAgendaAssignees?.selected_users ?? [];
         if (!name) {
             console.error("missing name in add command");
             return;
         }
-        const res = await add(name.trim(), { importance: parseInt(importance), desc: desc });
+        const input: Fields = { name: name.trim(), importance: importance, desc: desc, due_date: due_date };
+        const res = await add(input, assignees);
         const { channel, sender } = JSON.parse(view.private_metadata) as { channel: string, sender: string };
         await client.chat.postEphemeral({
             channel: channel,
