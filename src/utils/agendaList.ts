@@ -29,7 +29,7 @@ export function formatItems(xs: AgendaItem[]): RespondArguments {
     for (const [i, { name, importance, desc, due_date, assignees }] of xs.entries()) {
         // don't add a new line for optional fields if they weren't provided
         const ndesc = desc.trim() === "" ? "" : `\n description: ${desc}`;
-        const ndate = due_date.trim() === "" ? "" : `\n due: ${due_date}`;
+        const ndate = due_date === "0" ? "" : `\n due: <!date^${due_date}^{date_long_pretty} at {time}|sometime>`;
         const nassn = assignees.length === 0 ? "" : `\n assigned to: ${assignees.map(a => `<@${a}>`).join(", ")}`;
 
         attachments.push({

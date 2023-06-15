@@ -70,9 +70,8 @@ export function fieldInput(field: keyof Inputs, actid: string) {
         } as FieldInputMap[typeof field];
     } else if (field === "due_date") {
         return {
-            "type": "datepicker",
-            "placeholder": ptext("Select a date"),
-            "action_id": actid
+            "type": "datetimepicker",
+            "action_id": actid,
         } as FieldInputMap[typeof field];
     } else {
         throw new Error("Invalid field");

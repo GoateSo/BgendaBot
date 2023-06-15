@@ -8,7 +8,8 @@ import { isSucc } from "../utils/types";
  * initializes the /remitem command and its corresponding view submission listener
  * 
  * - /remitem - opens a modal for removing an item, prompting for the item to remove
- * - view submission - removes the item from the database and responds with a message to the user detailing the success or failure of the operation
+ * - view submission - removes the item from the database and responds with a message 
+ *   to the user detailing the success or failure of the operation
  */
 export function init() {
     app.command('/remitem', async ({ ack, client, body }) => {

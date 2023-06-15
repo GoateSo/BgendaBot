@@ -1,41 +1,52 @@
-import { Datepicker, MultiUsersSelect, PlainTextInput, StaticSelect } from "@slack/bolt"
-import { Left, Right } from "fp-ts/lib/Either"
+import {
+    DateTimepicker,
+    Datepicker,
+    MultiUsersSelect,
+    PlainTextInput,
+    StaticSelect,
+} from "@slack/bolt";
+import { Left, Right } from "fp-ts/lib/Either";
 
 // wrappr over either w/ string as error type and new names
-export type Succ<T> = Right<T>
-export type Fail = Left<string>
-export type Result<T> = Fail | Succ<T>
+export type Succ<T> = Right<T>;
+export type Fail = Left<string>;
+export type Result<T> = Fail | Succ<T>;
 
 export type Fields = {
-    name: string,
-    importance: string,
-    desc: string,
-    due_date: string,
-}
+    name: string;
+    importance: string;
+    desc: string;
+    due_date: string;
+};
 
 // input fields for agenda items (including assignees)
 export type Inputs = Fields & {
-    assignees: string[],
-}
+    assignees: string[];
+};
 
-// storage schema for redis db 
+// storage schema for redis db
 export type Schema = Fields & {
-    time: string // ISO string representing insertion time
-}
+    time: string; // ISO string representing insertion time
+};
 
 export type AgendaItem = Schema & {
-    assignees: string[]
-}
+    assignees: string[];
+};
 
 export type FieldInputMap = {
-    name: PlainTextInput,
-    importance: StaticSelect,
-    desc: PlainTextInput,
-    due_date: Datepicker
-    assignees: MultiUsersSelect
-}
+    name: PlainTextInput;
+    importance: StaticSelect;
+    desc: PlainTextInput;
+    due_date: DateTimepicker;
+    assignees: MultiUsersSelect;
+};
 
-export type UpdateData = { item: string, field: keyof Inputs, channel: string, sender: string }
+export type UpdateData = {
+    item: string;
+    field: keyof Inputs;
+    channel: string;
+    sender: string;
+};
 
 // importance levels for agenda items, duplicates allowed for aliases
 export enum Importance {
@@ -51,17 +62,18 @@ export enum Importance {
     // hi/high/max/3    -- high importance
     HI = 3,
     HIGH = 3,
-    MAX = 3
+    MAX = 3,
 }
 
-
-export function isValidImportance(importance: string): importance is keyof typeof Importance {
+export function isValidImportance(
+    importance: string
+): importance is keyof typeof Importance {
     return Object.keys(Importance).includes(importance);
 }
 
 /**
- * checks if a given string is a valid field of the item 
- * currently, the fields are 
+ * checks if a given string is a valid field of the item
+ * currently, the fields are
  * - name
  * - desc
  * - importance
@@ -69,7 +81,13 @@ export function isValidImportance(importance: string): importance is keyof typeo
  * @returns boolean if the field is a valid field name
  */
 export function isValidField(field: string): field is keyof Inputs {
-    return field === "name" || field === "desc" || field === "importance" || field === "due_date" || field === "assignees";
+    return (
+        field === "name" ||
+        field === "desc" ||
+        field === "importance" ||
+        field === "due_date" ||
+        field === "assignees"
+    );
 }
 
 export function fromStr(iName: keyof typeof Importance): Importance {
