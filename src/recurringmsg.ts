@@ -1,8 +1,8 @@
 import { RecurrenceRule, scheduleJob } from "node-schedule";
 import { getItems } from "./utils/db";
-import { isFail } from "./utils/types";
 import { formatItems } from "./utils/agendaList";
 import { app } from "./app";
+import { failed } from "./utils/Result";
 
 const rule = new RecurrenceRule();
 rule.dayOfWeek = [2];
@@ -13,11 +13,11 @@ rule.minute = 45;
 export const job = scheduleJob(rule, async () => {
     // send message to channel
     const res = await getItems();
-    if (isFail(res)) {
-        console.error(`failed to get items: ${res.left}`);
+    if (failed(res)) {
+        console.error(`failed to get items: ${res.reason}`);
         return;
     }
-    const items = res.right;
+    const items = res.value;
     const msg = formatItems(items);
     await app.client.chat.postMessage({
         channel: process.env.CHANNEL_ID as string,

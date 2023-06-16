@@ -1,6 +1,8 @@
 import { PlainTextElement, PlainTextOption } from "@slack/bolt";
 import { getItems } from "./db";
-import { FieldInputMap, Inputs, isFail } from "./types";
+import { FieldInputMap, Inputs } from "./types";
+import { failed } from "../utils/Result";
+
 
 /**
  * Gets all items from the database and formats them into a list
@@ -9,10 +11,10 @@ import { FieldInputMap, Inputs, isFail } from "./types";
 export async function itemsToOptions(): Promise<PlainTextOption[]> {
     // don't need to take the time to sort the items
     const items = await getItems(false);
-    if (isFail(items)) {
+    if (failed(items)) {
         throw new Error("Failed to get items");
     }
-    return items.right.map((item, i) => {
+    return items.value.map((item, i) => {
         return {
             "text": ptext(item.name),
             "value": i.toString()
@@ -39,7 +41,7 @@ export function ptext(text: string): PlainTextElement {
  * @param actid 
  * @returns a slack element for the given field
  */
-export function fieldInput(field: keyof Inputs, actid: string) {
+export function fieldInput(field: keyof Inputs, actid: string): FieldInputMap[typeof field] {
     // ngl quite a bit of a pain to typecast to `FieldInputMap[typeof field];` not sure why 
     // typescript doesn't infer it when the function is defined w/ return type `: FieldInputMap[typeof field]`
     if (field === "name" || field === "desc") {

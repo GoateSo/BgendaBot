@@ -1,8 +1,8 @@
-import { View } from "@slack/bolt";
 import { app } from "../app";
 import { add } from "../utils/db";
-import { Fields, isSucc } from "../utils/types";
-import { fieldInput, ptext } from "../utils/commandModals";
+import { Fields } from "../utils/types";
+import { succeeded } from "../utils/Result";
+import { addModal } from "./helpers/addHelpers";
 
 // respond with modal input for adding an item
 /**
@@ -18,75 +18,32 @@ import { fieldInput, ptext } from "../utils/commandModals";
 export function init() {
     app.command("/additem", async ({ ack, client, body }) => {
         await ack();
-        const addModal: View = {
-            callback_id: "additem",
-            type: "modal",
-            title: ptext("Add an Agenda item"),
-            submit: ptext("Submit"),
-            close: ptext("Cancel"),
-            blocks: [
-                {
-                    type: "input",
-                    block_id: "NameBlock",
-                    element: fieldInput("name", "AddAgendaName"),
-                    label: ptext("Item name"),
-                },
-                {
-                    type: "input",
-                    block_id: "ImportanceBlock",
-                    element: fieldInput("importance", "AddAgendaImportance"),
-                    label: ptext("Pick an importance level"),
-                },
-                {
-                    type: "input",
-                    block_id: "DescBlock",
-                    element: fieldInput("desc", "AddAgendaDesc"),
-                    optional: true,
-                    label: ptext("Description"),
-                },
-                {
-                    type: "input",
-                    block_id: "DueDateBlock",
-                    element: fieldInput("due_date", "AddAgendaDueDate"),
-                    optional: true,
-                    label: ptext("Due Date"),
-                },
-                {
-                    type: "input",
-                    block_id: "AssigneesBlock",
-                    element: fieldInput("assignees", "AddAgendaAssignees"),
-                    optional: true,
-                    label: ptext("Assignees"),
-                },
-            ],
-            private_metadata: JSON.stringify({
-                channel: body.channel_id,
-                sender: body.user_id,
-            }),
-        };
+        const view = addModal();
+        view.private_metadata = JSON.stringify({
+            channel: body.channel_id,
+            sender: body.user_id,
+        });
 
         await client.views.open({
             trigger_id: body.trigger_id,
-            view: addModal,
+            view: view,
         });
     });
 
     app.view("additem", async ({ ack, view, client }) => {
         await ack();
         const values = view.state.values;
-        const name = values?.NameBlock?.AddAgendaName?.value;
-        const imp = values?.ImportanceBlock?.AddAgendaImportance?.selected_option;
+        // get all inputs from the modal
+        const name = values?.NameBlock?.AgendaName?.value;
+        const imp = values?.ImportanceBlock?.AgendaImportance?.selected_option;
         const importance = imp?.value ?? "0";
-        const desc = values?.DescBlock?.AddAgendaDesc?.value ?? "";
-        const due_time =
-            values?.DueDateBlock?.AddAgendaDueDate?.selected_date_time ?? 0;
-        const assignees =
-            values?.AssigneesBlock?.AddAgendaAssignees?.selected_users ?? [];
+        const desc = values?.DescBlock?.AgendaDesc?.value ?? "";
+        const due_time = values?.DueDateBlock?.AgendaDueDate?.selected_date_time ?? 0;
+        const assignees = values?.AssigneesBlock?.AgendaAssignees?.selected_users ?? [];
         if (!name) {
             console.error("missing name in add command");
             return;
         }
-        const due_date = new Date(due_time * 1000);
         // const
         const input: Fields = {
             name: name.trim(),
@@ -99,15 +56,16 @@ export function init() {
             channel: string;
             sender: string;
         };
+
         await client.chat.postEphemeral({
             channel: channel,
             user: sender,
-            text: isSucc(res)
+            text: succeeded(res)
                 ? `Added item "${name}" with ${imp?.text?.text ?? "Default/Minimal"} importance,` +
                 `description "${desc.trim() === "" ? "<empty>" : desc}",` +
-                `due date "${due_time === 0 ? "<none>" : due_date.toLocaleDateString()}", ` +
+                `due date "${due_time === 0 ? "<none>" : new Date(due_time * 1000).toLocaleDateString()}", ` +
                 `and assignees ${assignees.length === 0 ? "<none>" : assignees.map((u) => `<@${u}>`).join(", ")}`
-                : res.left,
+                : res.reason,
         });
     });
 }

@@ -1,8 +1,7 @@
-import { View } from "@slack/bolt";
 import { app } from "../app";
-import { itemsToOptions, ptext } from "../utils/commandModals";
 import { rem } from "../utils/db";
-import { isSucc } from "../utils/types";
+import { succeeded } from "../utils/Result";
+import { remModal } from "./helpers/remHelpers";
 
 /**
  * initializes the /remitem command and its corresponding view submission listener
@@ -15,39 +14,16 @@ export function init() {
     app.command('/remitem', async ({ ack, client, body }) => {
         // removal of item, dynamic options
         // query db for items, then create options from them
-        const remModal = async (): Promise<View> => {
-            return {
-                "callback_id": "remitem",
-                "title": ptext("Remove an Agenda item"),
-                "submit": ptext("Submit"),
-                "close": ptext("Cancel"),
-                "type": "modal",
-                "blocks": [
-                    {
-                        type: "input",
-                        dispatch_action: true,
-                        element: {
-                            "type": "static_select",
-                            "placeholder": ptext("Select an item"),
-                            "options": await itemsToOptions(),
-                            "action_id": "RemoveItem"
-                        },
-                        label: ptext("Item"),
-                        block_id: "ItemBlock"
-                    }
-                ],
-                "private_metadata": JSON.stringify({
-                    "channel": body.channel_id,
-                    "sender": body.user_id
-                })
-            };
-        }
-
+        const view = await remModal();
+        view.private_metadata = JSON.stringify({
+            channel: body.channel_id,
+            sender: body.user_id
+        });
         await ack();
         try {
             await client.views.open({
                 trigger_id: body.trigger_id,
-                view: await remModal()
+                view: view
             });
         } catch (e) {
             console.error(e);
@@ -68,7 +44,7 @@ export function init() {
         await client.chat.postEphemeral({
             channel: channel,
             user: sender,
-            text: isSucc(res) ? `removal succeeded: ${item} successfully removed` : `removal failed: ${res.left}`
+            text: succeeded(res) ? `removal succeeded: ${item} successfully removed` : `removal failed: ${res.reason}`
         });
     });
 }

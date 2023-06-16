@@ -1,11 +1,12 @@
 import { app } from "../app";
 
 const helpMap: { [key: string]: string } = {
-    additem: "*/additem* - adds an agenda item with an optional importance level and added info",
+    additem: "*/additem* - adds an agenda item with an importance level, " +
+        "and optional additional info such as a description, due date, and assignees",
     remitem: "*/remitem* - removes an agenda item",
     listitems: "*/listitems* - lists all agenda items in order of importance and then in insertion order",
     clearitems: "*/clearitems* - clears all agenda items",
-    updateitem: "*/update* - updates an agenda item's importance level or added info",
+    updateitem: "*/update* - updates an agenda item's name, importance, description, due date, or assignees",
     help: "*/help* - lists all commands and their descriptions"
 }
 

@@ -1,6 +1,6 @@
 # WIP Slack bot for Agenda creation
 
-made in typescript primarily with slack bolt, and a bit of fp-ts for result handling. 
+made in typescript primarily with slack bolt. 
 
 ## From the Ground up
 
@@ -25,7 +25,7 @@ SLACK_BOT_TOKEN = your slack bot token
 PORT = the port you want to run the bot on (default if not specified is 3000)
 ```
 
-then run `npm run start` to start the bot.
+then run `npm start` to start the bot.
 
 ### Commands
 

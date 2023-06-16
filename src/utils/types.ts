@@ -1,16 +1,12 @@
 import {
     DateTimepicker,
-    Datepicker,
+    Middleware,
     MultiUsersSelect,
     PlainTextInput,
+    SlackCommandMiddlewareArgs,
     StaticSelect,
 } from "@slack/bolt";
-import { Left, Right } from "fp-ts/lib/Either";
-
-// wrappr over either w/ string as error type and new names
-export type Succ<T> = Right<T>;
-export type Fail = Left<string>;
-export type Result<T> = Fail | Succ<T>;
+import { StringIndexed } from "@slack/bolt/dist/types/helpers";
 
 export type Fields = {
     name: string;
@@ -65,21 +61,14 @@ export enum Importance {
     MAX = 3,
 }
 
+export type CommandListener = Middleware<SlackCommandMiddlewareArgs, StringIndexed>
+
 export function isValidImportance(
     importance: string
 ): importance is keyof typeof Importance {
     return Object.keys(Importance).includes(importance);
 }
 
-/**
- * checks if a given string is a valid field of the item
- * currently, the fields are
- * - name
- * - desc
- * - importance
- * @param field string to check if it is a valid field name
- * @returns boolean if the field is a valid field name
- */
 export function isValidField(field: string): field is keyof Inputs {
     return (
         field === "name" ||
@@ -92,12 +81,4 @@ export function isValidField(field: string): field is keyof Inputs {
 
 export function fromStr(iName: keyof typeof Importance): Importance {
     return Importance[iName];
-}
-
-export function isSucc<T>(result: Result<T>): result is Succ<T> {
-    return result._tag == "Right";
-}
-
-export function isFail<T>(result: Result<T>): result is Fail {
-    return result._tag == "Left";
 }

@@ -1,6 +1,6 @@
 import { createClient } from 'redis';
-import { left as fail, right as succ } from 'fp-ts/lib/Either';
-import { Importance, Schema, fromStr, isValidImportance, Result, Fields, AgendaItem, Inputs } from './types';
+import { Importance, Schema, fromStr, isValidImportance, Fields, AgendaItem, Inputs } from './types';
+import { Result, fail, succ } from "../utils/Result";
 
 const client = createClient();
 
@@ -97,10 +97,11 @@ export async function update(item: string, key: keyof Inputs, newVal: Inputs[typ
         const nval: Inputs[typeof key] = newVal as string;
         await client.hSet(item, key, nval);
 
-    } else if (key == "name") { // change name field
+    } else if (key === "name") { // change name field
 
         const nval: Inputs[typeof key] = newVal as string;
         // check if new name already exists
+        console.error("item name:", nval)
         if (await client.hExists(nval, "importance")) {
             return fail(`Item with name "${nval}" already in agenda`);
         }
