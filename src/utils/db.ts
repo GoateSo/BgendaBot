@@ -117,7 +117,7 @@ export async function update(item: string, key: keyof Inputs, newVal: Inputs[typ
             nval, { time, importance, desc, due_date }
         );
         for (const assignee of assignees) {
-            client.lPush(`${nval}:assignees`, assignee);
+            await client.lPush(`${nval}:assignees`, assignee);
         }
 
     } else if (key === "due_date") {
@@ -129,7 +129,7 @@ export async function update(item: string, key: keyof Inputs, newVal: Inputs[typ
 
         await client.del(`${item}:assignees`);
         for (const assignee of newVal) {
-            client.lPush(`${item}:assignees`, assignee);
+            await client.lPush(`${item}:assignees`, assignee);
         }
 
     } else {

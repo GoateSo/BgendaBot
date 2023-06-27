@@ -91,29 +91,18 @@ export function updateView({ item, field, channel, sender }: UpdateData): View {
         private_metadata: JSON.stringify({ item, field, channel, sender }),
         type: "modal",
         callback_id: "updatedUpdate",
-        title: {
-            type: "plain_text",
-            text: "Update Description",
-            emoji: true,
-        },
+        title: ptext("Update Description"),
         blocks: [
             {
                 type: "section",
-                text: {
-                    type: "plain_text",
-                    text: `editing ${field} of ${item} `,
-                },
+                text: ptext(`editing ${field} of ${item}`),
             },
             {
                 type: "input",
                 block_id: `updateBlock`,
                 element: fieldInput(field, "updateInput"),
                 optional: field === "assignees" ? true : false,
-                label: {
-                    type: "plain_text",
-                    text: `new ${field}`,
-                    emoji: true,
-                },
+                label: ptext(`new ${field}`),
             },
         ],
     };

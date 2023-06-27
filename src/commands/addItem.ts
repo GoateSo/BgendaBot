@@ -18,6 +18,24 @@ import { addModal } from "./helpers/addHelpers";
 export function init() {
     app.command("/additem", async ({ ack, client, body }) => {
         await ack();
+        // command body provided, will be used as name field
+        if (body.text) {
+            const input: Fields = {
+                name: body.text,
+                importance: "0",
+                desc: "",
+                due_date: "0",
+            };
+            const res = await add(input);
+            await client.chat.postMessage({
+                channel: body.channel_id,
+                text: succeeded(res)
+                    ? `adding succeeded: item "${body.text}" successfully added`
+                    : res.reason,
+            });
+            return;
+        }
+        // no command body provided, open modal
         const view = addModal();
         view.private_metadata = JSON.stringify({
             channel: body.channel_id,
